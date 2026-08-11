@@ -28,7 +28,6 @@ public class SecurityConfig {
 
     private final SecurityFilter securityFilter;
 
-    // Domínio de produção configurado via variável de ambiente
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
 
@@ -40,13 +39,15 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(authorize -> authorize
-                        // Rotas públicas de autenticação
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/google").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/facebook").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/forgot-password").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/verify-email").permitAll()
-                        // Tudo mais exige autenticação
+                        .requestMatchers(HttpMethod.POST, "/auth/resend-verification").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/reset-password").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/bugs").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
@@ -57,11 +58,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Desenvolvimento local + domínio de produção via variável de ambiente
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
-                frontendUrl              // ex: https://tokenforge.seudominio.com
+                frontendUrl              
         ));
 
         configuration.setAllowedMethods(Arrays.asList(

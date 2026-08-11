@@ -33,11 +33,23 @@ public class User {
     @Column(name = "google_id", unique = true)
     private String googleId;
 
+    @Column(name = "facebook_id", unique = true)
+    private String facebookId;
+
     @Column(name = "email_verified", nullable = false)
     private boolean emailVerified = false;
 
     @Column(name = "verification_code")
     private String verificationCode;
+
+    @Column(name = "verification_code_expiry")
+    private LocalDateTime verificationCodeExpiry;
+
+    @Column(name = "reset_token")
+    private String resetToken;
+
+    @Column(name = "reset_token_expiry")
+    private LocalDateTime resetTokenExpiry;
 
     @Column(name = "avatar_url")
     private String avatarUrl;
