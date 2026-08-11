@@ -1,6 +1,8 @@
 package com.tokenforge.api.security;
 
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,6 +27,8 @@ import java.util.List;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     private final SecurityFilter securityFilter;
 
@@ -58,10 +62,13 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
+        String allowedFrontendUrl = frontendUrl.trim();
+        log.info("[CORS] app.frontend-url resolvido = [{}] (length={})", allowedFrontendUrl, allowedFrontendUrl.length());
+
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
-                frontendUrl.trim()
+                allowedFrontendUrl
         ));
 
         configuration.setAllowedMethods(Arrays.asList(
