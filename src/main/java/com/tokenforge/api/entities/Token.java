@@ -31,6 +31,8 @@ public class Token {
 
     private String color;
 
+    private String colorIdentity;
+
     private String power;
 
     private String toughness;

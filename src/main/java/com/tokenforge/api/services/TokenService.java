@@ -85,6 +85,7 @@ public class TokenService {
         token.setName(dto.name());
         token.setTypeLine(dto.typeLine());
         token.setColor(dto.color());
+        token.setColorIdentity(dto.colorIdentity());
         token.setPower(dto.power());
         token.setToughness(dto.toughness());
         token.setAbilities(dto.abilities());

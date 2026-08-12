@@ -7,6 +7,7 @@ public record TokenRequestDTO(
         String name,
         String typeLine,
         String color,
+        String colorIdentity,
         String power,
         String toughness,
         String abilities,
