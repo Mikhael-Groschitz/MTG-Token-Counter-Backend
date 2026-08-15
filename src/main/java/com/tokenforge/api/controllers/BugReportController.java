@@ -1,8 +1,10 @@
 package com.tokenforge.api.controllers;
 
+import com.tokenforge.api.entities.User;
 import com.tokenforge.api.services.BugReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -27,9 +29,11 @@ public class BugReportController {
             @RequestParam(required = false) String steps,
             @RequestParam(required = false) String environment,
             @RequestParam(required = false) String version,
-            @RequestParam(value = "files", required = false) List<MultipartFile> files
+            @RequestParam(value = "reporterEmail", required = false) String reporterEmail,
+            @RequestParam(value = "files", required = false) List<MultipartFile> files,
+            @AuthenticationPrincipal User user
     ) {
-        bugReportService.submit(title, module, severity, description, steps, environment, version, files);
+        bugReportService.submit(title, module, severity, description, steps, environment, version, reporterEmail, files, user);
         return ResponseEntity.ok().build();
     }
 }

@@ -66,7 +66,7 @@ public class EmailService {
         }
     }
 
-    public void sendBugReport(String subject, String body, List<MultipartFile> attachments) {
+    public void sendBugReport(String subject, String body, List<MultipartFile> attachments, String replyTo) {
         String recipient = (bugReportRecipientOverride != null && !bugReportRecipientOverride.isBlank())
                 ? bugReportRecipientOverride
                 : fromAddress;
@@ -77,6 +77,9 @@ public class EmailService {
             helper.setTo(recipient);
             helper.setSubject(subject);
             helper.setText(body);
+            if (replyTo != null && !replyTo.isBlank()) {
+                helper.setReplyTo(replyTo.trim());
+            }
 
             if (attachments != null) {
                 for (MultipartFile file : attachments) {
