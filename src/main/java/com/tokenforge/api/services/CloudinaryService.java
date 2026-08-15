@@ -46,6 +46,9 @@ public class CloudinaryService {
         } catch (IOException e) {
             log.error("Erro ao fazer upload da imagem para o Cloudinary: {}", e.getMessage(), e);
             throw new BusinessRuleException("Erro ao processar a imagem. Verifique o formato e tente novamente.");
+        } catch (RuntimeException e) {
+            log.error("Erro ao comunicar com o Cloudinary: {}", e.getMessage(), e);
+            throw new BusinessRuleException("Erro ao conectar com o serviço de imagens. Verifique a configuração do Cloudinary.");
         }
     }
 }
