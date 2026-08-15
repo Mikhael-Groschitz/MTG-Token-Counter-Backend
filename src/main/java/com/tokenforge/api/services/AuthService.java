@@ -10,9 +10,11 @@ import com.tokenforge.api.dto.LoginRequest;
 import com.tokenforge.api.dto.RegisterRequest;
 import com.tokenforge.api.dto.ResendVerificationRequest;
 import com.tokenforge.api.dto.ResetPasswordRequest;
+import com.tokenforge.api.dto.UpdateProfileRequest;
 import com.tokenforge.api.dto.VerifyEmailRequest;
 import com.tokenforge.api.entities.User;
 import com.tokenforge.api.exceptions.BusinessRuleException;
+import com.tokenforge.api.exceptions.EmailNotVerifiedException;
 import com.tokenforge.api.repositories.UserRepository;
 import com.tokenforge.api.security.JwtService;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +49,10 @@ public class AuthService {
 
     private static final String FACEBOOK_DEBUG_TOKEN_URL = "https://graph.facebook.com/debug_token";
     private static final String FACEBOOK_ME_URL = "https://graph.facebook.com/me";
+
+    private static final String PROVIDER_LOCAL = "local";
+    private static final String PROVIDER_GOOGLE = "google";
+    private static final String PROVIDER_FACEBOOK = "facebook";
 
     private static final int VERIFICATION_CODE_TTL_MINUTES = 15;
     private static final int RESET_TOKEN_TTL_MINUTES = 30;
@@ -87,7 +93,7 @@ public class AuthService {
         emailService.sendVerificationCode(newUser.getEmail(), newUser.getVerificationCode());
 
         String token = jwtService.generateToken(newUser.getEmail());
-        return new AuthResponse(token, newUser.getUsername(), newUser.getEmail());
+        return new AuthResponse(token, newUser.getUsername(), newUser.getEmail(), PROVIDER_LOCAL);
     }
 
     // ── Verificação de e-mail ──────────────────────────────
@@ -153,6 +159,38 @@ public class AuthService {
         userRepository.save(user);
     }
 
+    // ── Atualização de perfil ──────────────────────────────
+
+    public AuthResponse updateProfile(User authenticatedUser, UpdateProfileRequest request) {
+        User user = userRepository.findById(authenticatedUser.getId())
+                .orElseThrow(() -> new BusinessRuleException("Usuário não encontrado."));
+
+        boolean wantsPasswordChange = request.newPassword() != null && !request.newPassword().isBlank();
+
+        if (wantsPasswordChange) {
+            if (!PROVIDER_LOCAL.equals(resolveProvider(user))) {
+                throw new BusinessRuleException(
+                        "Contas conectadas via Google ou Facebook não possuem senha própria " +
+                                "e não podem alterá-la por aqui.");
+            }
+            if (request.currentPassword() == null || request.currentPassword().isBlank()) {
+                throw new BusinessRuleException("Informe sua senha atual para definir uma nova senha.");
+            }
+            if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
+                throw new BusinessRuleException("Senha atual incorreta.");
+            }
+        }
+
+        user.setUsername(request.username().trim());
+        if (wantsPasswordChange) {
+            user.setPassword(passwordEncoder.encode(request.newPassword()));
+        }
+        userRepository.save(user);
+
+        String token = jwtService.generateToken(user.getEmail());
+        return new AuthResponse(token, user.getUsername(), user.getEmail(), resolveProvider(user));
+    }
+
     private void applyNewVerificationCode(User user) {
         String code = String.format("%06d", secureRandom.nextInt(1_000_000));
         user.setVerificationCode(code);
@@ -171,8 +209,12 @@ public class AuthService {
                     "Credenciais inválidas. Verifique seu e-mail/usuário e senha.");
         }
 
+        if (!user.isEmailVerified()) {
+            throw new EmailNotVerifiedException(user.getEmail());
+        }
+
         String token = jwtService.generateToken(user.getEmail());
-        return new AuthResponse(token, user.getUsername(), user.getEmail());
+        return new AuthResponse(token, user.getUsername(), user.getEmail(), resolveProvider(user));
     }
 
     // ── Login com Google ──────────────────────────────────
@@ -255,9 +297,14 @@ public class AuthService {
                         }));
 
         String token = jwtService.generateToken(user.getEmail());
-        return new AuthResponse(token, user.getUsername(), user.getEmail());
+        return new AuthResponse(token, user.getUsername(), user.getEmail(), resolveProvider(user));
     }
 
+    private String resolveProvider(User user) {
+        if (user.getGoogleId() != null) return PROVIDER_GOOGLE;
+        if (user.getFacebookId() != null) return PROVIDER_FACEBOOK;
+        return PROVIDER_LOCAL;
+    }
 
     private JsonNode verifyGoogleIdToken(String idToken) {
         try {

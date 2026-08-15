@@ -2,6 +2,7 @@ package com.tokenforge.api.config;
 
 import com.tokenforge.api.errorhandler.ErrorResponse;
 import com.tokenforge.api.exceptions.BusinessRuleException;
+import com.tokenforge.api.exceptions.EmailNotVerifiedException;
 import com.tokenforge.api.exceptions.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +49,21 @@ public class GlobalExceptionHandler {
                 null
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ResponseEntity<ErrorResponse> handleEmailNotVerifiedException(EmailNotVerifiedException ex) {
+        Map<String, String> errors = new HashMap<>();
+        errors.put("code", "EMAIL_NOT_VERIFIED");
+        errors.put("email", ex.getEmail());
+
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.FORBIDDEN.value(),
+                ex.getMessage(),
+                LocalDateTime.now(),
+                errors
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
     }
 
     @ExceptionHandler(BusinessRuleException.class)

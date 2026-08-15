@@ -8,12 +8,15 @@ import com.tokenforge.api.dto.LoginRequest;
 import com.tokenforge.api.dto.RegisterRequest;
 import com.tokenforge.api.dto.ResendVerificationRequest;
 import com.tokenforge.api.dto.ResetPasswordRequest;
+import com.tokenforge.api.dto.UpdateProfileRequest;
 import com.tokenforge.api.dto.VerifyEmailRequest;
+import com.tokenforge.api.entities.User;
 import com.tokenforge.api.services.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -68,5 +71,12 @@ public class AuthController {
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request);
         return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<AuthResponse> updateProfile(
+            @Valid @RequestBody UpdateProfileRequest request,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(authService.updateProfile(user, request));
     }
 }
