@@ -33,9 +33,6 @@ public class User {
     @Column(name = "google_id", unique = true)
     private String googleId;
 
-    @Column(name = "facebook_id", unique = true)
-    private String facebookId;
-
     @Column(name = "email_verified", nullable = false)
     private boolean emailVerified = false;
 

@@ -1,7 +1,6 @@
 package com.tokenforge.api.controllers;
 
 import com.tokenforge.api.dto.AuthResponse;
-import com.tokenforge.api.dto.FacebookAuthRequest;
 import com.tokenforge.api.dto.ForgotPasswordRequest;
 import com.tokenforge.api.dto.GoogleAuthRequest;
 import com.tokenforge.api.dto.LoginRequest;
@@ -40,12 +39,6 @@ public class AuthController {
     @PostMapping("/google")
     public ResponseEntity<AuthResponse> googleLogin(@Valid @RequestBody GoogleAuthRequest request) {
         AuthResponse response = authService.googleAuth(request);
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/facebook")
-    public ResponseEntity<AuthResponse> facebookLogin(@Valid @RequestBody FacebookAuthRequest request) {
-        AuthResponse response = authService.facebookAuth(request);
         return ResponseEntity.ok(response);
     }
 

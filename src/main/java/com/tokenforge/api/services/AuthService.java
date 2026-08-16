@@ -3,7 +3,6 @@ package com.tokenforge.api.services;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tokenforge.api.dto.AuthResponse;
-import com.tokenforge.api.dto.FacebookAuthRequest;
 import com.tokenforge.api.dto.ForgotPasswordRequest;
 import com.tokenforge.api.dto.GoogleAuthRequest;
 import com.tokenforge.api.dto.LoginRequest;
@@ -26,11 +25,9 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -47,12 +44,8 @@ public class AuthService {
     private static final String GOOGLE_TOKEN_INFO_URL =
             "https://oauth2.googleapis.com/tokeninfo?id_token=";
 
-    private static final String FACEBOOK_DEBUG_TOKEN_URL = "https://graph.facebook.com/debug_token";
-    private static final String FACEBOOK_ME_URL = "https://graph.facebook.com/me";
-
     private static final String PROVIDER_LOCAL = "local";
     private static final String PROVIDER_GOOGLE = "google";
-    private static final String PROVIDER_FACEBOOK = "facebook";
 
     private static final int VERIFICATION_CODE_TTL_MINUTES = 15;
     private static final int RESET_TOKEN_TTL_MINUTES = 30;
@@ -66,12 +59,6 @@ public class AuthService {
 
     @Value("${google.client-id}")
     private String googleClientId;
-
-    @Value("${facebook.app-id}")
-    private String facebookAppId;
-
-    @Value("${facebook.app-secret}")
-    private String facebookAppSecret;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
@@ -170,7 +157,7 @@ public class AuthService {
         if (wantsPasswordChange) {
             if (!PROVIDER_LOCAL.equals(resolveProvider(user))) {
                 throw new BusinessRuleException(
-                        "Contas conectadas via Google ou Facebook não possuem senha própria " +
+                        "Contas conectadas via Google não possuem senha própria " +
                                 "e não podem alterá-la por aqui.");
             }
             if (request.currentPassword() == null || request.currentPassword().isBlank()) {
@@ -240,31 +227,6 @@ public class AuthService {
         );
     }
 
-    // ── Login com Facebook ─────────────────────────────────
-
-    public AuthResponse facebookAuth(FacebookAuthRequest request) {
-        JsonNode profile = verifyFacebookAccessToken(request.accessToken());
-
-        String facebookId = profile.path("id").asText();
-        String email       = profile.path("email").asText(null);
-        String name        = profile.path("name").asText();
-
-        if (email == null || email.isBlank()) {
-            throw new BusinessRuleException(
-                    "Não foi possível obter o e-mail da sua conta do Facebook. " +
-                            "Verifique se a permissão de e-mail foi concedida e tente novamente."
-            );
-        }
-
-        String username = (!name.isBlank()) ? name : email.split("@")[0];
-
-        return socialAuth(
-                "Facebook", email, username, facebookId,
-                userRepository.findByFacebookId(facebookId),
-                User::getFacebookId, User::setFacebookId
-        );
-    }
-
     private AuthResponse socialAuth(
             String providerLabel,
             String email,
@@ -302,7 +264,6 @@ public class AuthService {
 
     private String resolveProvider(User user) {
         if (user.getGoogleId() != null) return PROVIDER_GOOGLE;
-        if (user.getFacebookId() != null) return PROVIDER_FACEBOOK;
         return PROVIDER_LOCAL;
     }
 
@@ -333,54 +294,4 @@ public class AuthService {
         }
     }
 
-    private JsonNode verifyFacebookAccessToken(String accessToken) {
-        try {
-            HttpClient client = HttpClient.newHttpClient();
-            String appAccessToken = facebookAppId + "|" + facebookAppSecret;
-
-            String debugUrl = FACEBOOK_DEBUG_TOKEN_URL
-                    + "?input_token=" + URLEncoder.encode(accessToken, StandardCharsets.UTF_8)
-                    + "&access_token=" + URLEncoder.encode(appAccessToken, StandardCharsets.UTF_8);
-
-            HttpResponse<String> debugResponse = client.send(
-                    HttpRequest.newBuilder().uri(URI.create(debugUrl)).GET().build(),
-                    HttpResponse.BodyHandlers.ofString()
-            );
-
-            if (debugResponse.statusCode() != 200) {
-                log.warn("Facebook debug_token retornou status {}: {}", debugResponse.statusCode(), debugResponse.body());
-                throw new BusinessRuleException("Token do Facebook inválido ou expirado.");
-            }
-
-            JsonNode debugData = objectMapper.readTree(debugResponse.body()).path("data");
-            boolean valid = debugData.path("is_valid").asBoolean(false);
-            String tokenAppId = debugData.path("app_id").asText("");
-
-            if (!valid || !facebookAppId.equals(tokenAppId)) {
-                throw new BusinessRuleException("Token do Facebook não pertence a esta aplicação.");
-            }
-
-            String profileUrl = FACEBOOK_ME_URL
-                    + "?fields=id,email,name"
-                    + "&access_token=" + URLEncoder.encode(accessToken, StandardCharsets.UTF_8);
-
-            HttpResponse<String> profileResponse = client.send(
-                    HttpRequest.newBuilder().uri(URI.create(profileUrl)).GET().build(),
-                    HttpResponse.BodyHandlers.ofString()
-            );
-
-            if (profileResponse.statusCode() != 200) {
-                log.warn("Facebook /me retornou status {}: {}", profileResponse.statusCode(), profileResponse.body());
-                throw new BusinessRuleException("Não foi possível obter seu perfil do Facebook.");
-            }
-
-            return objectMapper.readTree(profileResponse.body());
-
-        } catch (BusinessRuleException e) {
-            throw e;
-        } catch (IOException | InterruptedException e) {
-            log.error("Erro ao verificar token do Facebook: {}", e.getMessage(), e);
-            throw new BusinessRuleException("Erro ao verificar autenticação com o Facebook.");
-        }
-    }
 }
