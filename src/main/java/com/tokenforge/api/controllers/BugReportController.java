@@ -27,13 +27,12 @@ public class BugReportController {
             @RequestParam(required = false) String severity,
             @RequestParam String description,
             @RequestParam(required = false) String steps,
-            @RequestParam(required = false) String environment,
-            @RequestParam(required = false) String version,
+            @RequestParam(required = false) String occurredAt,
             @RequestParam(value = "reporterEmail", required = false) String reporterEmail,
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
             @AuthenticationPrincipal User user
     ) {
-        bugReportService.submit(title, module, severity, description, steps, environment, version, reporterEmail, files, user);
+        bugReportService.submit(title, module, severity, description, steps, occurredAt, reporterEmail, files, user);
         return ResponseEntity.ok().build();
     }
 }

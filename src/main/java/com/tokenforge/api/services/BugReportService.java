@@ -23,8 +23,7 @@ public class BugReportService {
             String severity,
             String description,
             String steps,
-            String environment,
-            String version,
+            String occurredAt,
             String reporterEmail,
             List<MultipartFile> files,
             User user
@@ -44,11 +43,9 @@ public class BugReportService {
         checkMaxLength("Severidade", severity, TEXT_FIELD_MAX_LENGTH);
         checkMaxLength("Descrição", description, TEXT_FIELD_MAX_LENGTH);
         checkMaxLength("Passos para reproduzir", steps, TEXT_FIELD_MAX_LENGTH);
-        checkMaxLength("Ambiente", environment, TEXT_FIELD_MAX_LENGTH);
-        checkMaxLength("Versão", version, TEXT_FIELD_MAX_LENGTH);
 
         String subject = "[TokenForge] Bug report: " + title;
-        String body = buildBody(title, module, severity, description, steps, environment, version, files, reporterEmail, user);
+        String body = buildBody(title, module, severity, description, steps, occurredAt, files, reporterEmail, user);
         String replyTo = user != null ? user.getEmail() : reporterEmail;
 
         emailService.sendBugReport(subject, body, files, replyTo);
@@ -56,15 +53,14 @@ public class BugReportService {
 
     private String buildBody(
             String title, String module, String severity, String description,
-            String steps, String environment, String version, List<MultipartFile> files,
+            String steps, String occurredAt, List<MultipartFile> files,
             String reporterEmail, User user
     ) {
         StringBuilder sb = new StringBuilder();
         sb.append("Título: ").append(title).append("\n");
         sb.append("Módulo: ").append(orDefault(module, "-")).append("\n");
         sb.append("Severidade: ").append(orDefault(severity, "-")).append("\n");
-        sb.append("Ambiente: ").append(orDefault(environment, "-")).append("\n");
-        sb.append("Versão: ").append(orDefault(version, "-")).append("\n");
+        sb.append("Data do ocorrido: ").append(orDefault(occurredAt, "-")).append("\n");
         sb.append("Reportado por: ").append(reporterInfo(user, reporterEmail)).append("\n\n");
         sb.append("Descrição:\n").append(description).append("\n\n");
         if (steps != null && !steps.isBlank()) {
