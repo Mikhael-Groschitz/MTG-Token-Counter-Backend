@@ -55,9 +55,9 @@ cp .env.example .env
 | `GOOGLE_CLIENT_ID` | Client ID usado na verificação do login com Google |
 | `FRONTEND_URL` | Origem permitida no CORS (padrão do frontend) |
 | `JWT_SECRET` | Segredo para assinatura dos tokens JWT (mín. 32 caracteres) |
-| `GMAIL_USERNAME` | E-mail usado para envio de mensagens (verificação/recuperação) |
-| `GMAIL_APP_PASSWORD` | Senha de app do Gmail |
-| `BUG_REPORT_EMAIL` | (Opcional) destino dos reports de bug; usa `GMAIL_USERNAME` se vazio |
+| `RESEND_API_KEY` | API key do Resend usada para envio de e-mails |
+| `RESEND_FROM_EMAIL` | Remetente dos e-mails (precisa ser de um domínio verificado no Resend) |
+| `BUG_REPORT_EMAIL` | (Opcional) destino dos reports de bug; usa `RESEND_FROM_EMAIL` se vazio |
 
 As variáveis são carregadas automaticamente pelo Spring a partir de `src/main/resources/application.properties`. Configure-as no seu ambiente, IDE, ou em um `.env` carregado pela sua ferramenta de execução preferida.
 
