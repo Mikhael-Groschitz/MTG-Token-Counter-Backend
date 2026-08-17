@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tokenforge.api.errorhandler.ErrorResponse;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Refill;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -87,7 +86,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private Bucket newBucket(LimitedRoute route) {
-        Bandwidth limit = Bandwidth.classic(route.capacity(), Refill.intervally(route.capacity(), route.period()));
+        Bandwidth limit = Bandwidth.builder()
+                .capacity(route.capacity())
+                .refillIntervally(route.capacity(), route.period())
+                .build();
         return Bucket.builder().addLimit(limit).build();
     }
 

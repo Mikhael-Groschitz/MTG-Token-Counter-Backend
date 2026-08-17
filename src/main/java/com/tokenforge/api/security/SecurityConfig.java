@@ -58,8 +58,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/bugs").permitAll()
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(rateLimitFilter, SecurityFilter.class)
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(rateLimitFilter, SecurityFilter.class)
                 .build();
     }
 
