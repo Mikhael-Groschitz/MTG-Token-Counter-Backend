@@ -49,6 +49,7 @@ public class AuthService {
 
     private static final int VERIFICATION_CODE_TTL_MINUTES = 15;
     private static final int RESET_TOKEN_TTL_MINUTES = 30;
+    private static final int MAX_VERIFICATION_ATTEMPTS = 5;
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -93,16 +94,26 @@ public class AuthService {
             return;
         }
 
-        if (user.getVerificationCode() == null
-                || !user.getVerificationCode().equals(request.code())
-                || user.getVerificationCodeExpiry() == null
-                || user.getVerificationCodeExpiry().isBefore(LocalDateTime.now())) {
+        if (user.getVerificationAttempts() >= MAX_VERIFICATION_ATTEMPTS) {
+            throw new BusinessRuleException(
+                    "Número máximo de tentativas excedido. Solicite um novo código.");
+        }
+
+        boolean codeMatches = user.getVerificationCode() != null
+                && user.getVerificationCode().equals(request.code())
+                && user.getVerificationCodeExpiry() != null
+                && user.getVerificationCodeExpiry().isAfter(LocalDateTime.now());
+
+        if (!codeMatches) {
+            user.setVerificationAttempts(user.getVerificationAttempts() + 1);
+            userRepository.save(user);
             throw new BusinessRuleException("Código inválido ou expirado.");
         }
 
         user.setEmailVerified(true);
         user.setVerificationCode(null);
         user.setVerificationCodeExpiry(null);
+        user.setVerificationAttempts(0);
         userRepository.save(user);
     }
 
@@ -182,6 +193,7 @@ public class AuthService {
         String code = String.format("%06d", secureRandom.nextInt(1_000_000));
         user.setVerificationCode(code);
         user.setVerificationCodeExpiry(LocalDateTime.now().plusMinutes(VERIFICATION_CODE_TTL_MINUTES));
+        user.setVerificationAttempts(0);
     }
 
     // ── Login tradicional ─────────────────────────────────

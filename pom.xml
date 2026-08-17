@@ -93,6 +93,13 @@
 
         <!-- Sem dependência externa para Google — verificação via HTTP nativo -->
 
+        <!-- Rate limiting -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>8.10.1</version>
+        </dependency>
+
     </dependencies>
 
     <build>

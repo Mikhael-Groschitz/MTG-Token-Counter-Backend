@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -32,7 +33,11 @@ public class CloudinaryService {
         try {
             @SuppressWarnings("unchecked")
             Map<Object, Object> uploadResult = cloudinary.uploader().upload(
-                    base64Image, ObjectUtils.emptyMap()
+                    base64Image,
+                    ObjectUtils.asMap(
+                            "resource_type", "image",
+                            "allowed_formats", List.of("png", "jpg", "jpeg", "webp", "gif")
+                    )
             );
 
             Object secureUrl = uploadResult.get("secure_url");

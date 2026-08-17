@@ -42,6 +42,9 @@ public class User {
     @Column(name = "verification_code_expiry")
     private LocalDateTime verificationCodeExpiry;
 
+    @Column(name = "verification_attempts", nullable = false)
+    private int verificationAttempts = 0;
+
     @Column(name = "reset_token")
     private String resetToken;
 

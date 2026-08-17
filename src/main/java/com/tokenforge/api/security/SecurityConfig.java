@@ -20,6 +20,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -31,9 +32,13 @@ public class SecurityConfig {
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     private final SecurityFilter securityFilter;
+    private final RateLimitFilter rateLimitFilter;
 
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
+
+    @Value("${app.cors.allow-dev-origins:false}")
+    private boolean allowDevOrigins;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -53,6 +58,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/bugs").permitAll()
                         .anyRequest().authenticated()
                 )
+                .addFilterBefore(rateLimitFilter, SecurityFilter.class)
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
@@ -64,11 +70,13 @@ public class SecurityConfig {
         String allowedFrontendUrl = frontendUrl.trim();
         log.info("[CORS] app.frontend-url resolvido = [{}] (length={})", allowedFrontendUrl, allowedFrontendUrl.length());
 
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-                allowedFrontendUrl
-        ));
+        List<String> allowedOrigins = new ArrayList<>();
+        allowedOrigins.add(allowedFrontendUrl);
+        if (allowDevOrigins) {
+            allowedOrigins.add("http://localhost:5173");
+            allowedOrigins.add("http://127.0.0.1:5173");
+        }
+        configuration.setAllowedOrigins(allowedOrigins);
 
         configuration.setAllowedMethods(Arrays.asList(
                 "GET", "POST", "PUT", "DELETE", "OPTIONS"

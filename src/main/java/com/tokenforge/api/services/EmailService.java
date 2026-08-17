@@ -14,13 +14,20 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
+
+    private static final Set<String> ALLOWED_ATTACHMENT_CONTENT_TYPES = Set.of(
+            "image/png", "image/jpeg", "image/webp", "image/gif",
+            "text/plain", "application/pdf"
+    );
 
     private final JavaMailSender mailSender;
 
@@ -83,9 +90,7 @@ public class EmailService {
 
             if (attachments != null) {
                 for (MultipartFile file : attachments) {
-                    if (file != null && !file.isEmpty()) {
-                        helper.addAttachment(file.getOriginalFilename(), file);
-                    }
+                    attachIfValid(helper, file);
                 }
             }
 
@@ -94,5 +99,26 @@ public class EmailService {
             log.error("Falha ao enviar bug report por e-mail: {}", e.getMessage(), e);
             throw new BusinessRuleException("Não foi possível enviar seu report agora. Tente novamente em instantes.");
         }
+    }
+
+    private void attachIfValid(MimeMessageHelper helper, MultipartFile file) throws MessagingException {
+        if (file == null || file.isEmpty()) {
+            return;
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_ATTACHMENT_CONTENT_TYPES.contains(contentType)) {
+            throw new BusinessRuleException(
+                    "Tipo de arquivo não permitido nos anexos. " +
+                            "Envie apenas imagens (PNG, JPEG, WEBP, GIF), PDF ou texto simples.");
+        }
+        helper.addAttachment(sanitizeFilename(file.getOriginalFilename()), file);
+    }
+
+    private String sanitizeFilename(String filename) {
+        if (filename == null || filename.isBlank()) {
+            return "anexo";
+        }
+        String base = Paths.get(filename).getFileName().toString();
+        return base.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 }

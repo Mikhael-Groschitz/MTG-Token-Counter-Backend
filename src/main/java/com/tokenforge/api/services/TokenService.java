@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -19,6 +20,9 @@ import java.util.stream.Collectors;
 public class TokenService {
 
     private static final int MAX_TOKENS_PER_USER = 5;
+
+    private static final Pattern UUID_PATTERN = Pattern.compile(
+            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
 
     private final TokenRepository tokenRepository;
     private final CloudinaryService cloudinaryService;
@@ -55,6 +59,7 @@ public class TokenService {
 
     @Transactional
     public TokenResponseDTO updateToken(String id, TokenRequestDTO dto, User user) {
+        validateId(id);
         Token token = tokenRepository.findByIdAndOwnerId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Token não encontrado na sua biblioteca."
@@ -72,6 +77,7 @@ public class TokenService {
 
     @Transactional
     public void deleteToken(String id, User user) {
+        validateId(id);
         Token token = tokenRepository.findByIdAndOwnerId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Token não encontrado ou acesso negado."
@@ -80,6 +86,12 @@ public class TokenService {
     }
 
     // ── Helpers ───────────────────────────────────────────
+
+    private void validateId(String id) {
+        if (id == null || !UUID_PATTERN.matcher(id).matches()) {
+            throw new ResourceNotFoundException("Token não encontrado na sua biblioteca.");
+        }
+    }
 
     private void updateTokenFields(Token token, TokenRequestDTO dto) {
         token.setName(dto.name());
@@ -97,8 +109,14 @@ public class TokenService {
      * e retorna a URL permanente. Caso contrário, retorna a URL diretamente.
      */
     private String resolveImageUrl(String imageUrl) {
-        if (imageUrl != null && imageUrl.startsWith("data:image")) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return imageUrl;
+        }
+        if (imageUrl.startsWith("data:image")) {
             return cloudinaryService.uploadImage(imageUrl);
+        }
+        if (!imageUrl.startsWith("https://")) {
+            throw new BusinessRuleException("A URL da imagem deve começar com https://.");
         }
         return imageUrl;
     }
