@@ -78,7 +78,7 @@ public class AuthService {
         applyNewVerificationCode(newUser);
         userRepository.save(newUser);
 
-        emailService.sendVerificationCode(newUser.getEmail(), newUser.getVerificationCode());
+        emailService.sendVerificationCode(newUser.getEmail(), newUser.getVerificationCode(), VERIFICATION_CODE_TTL_MINUTES);
 
         String token = jwtService.generateToken(newUser.getEmail());
         return new AuthResponse(token, newUser.getUsername(), newUser.getEmail(), PROVIDER_LOCAL);
@@ -125,7 +125,7 @@ public class AuthService {
 
             applyNewVerificationCode(user);
             userRepository.save(user);
-            emailService.sendVerificationCode(user.getEmail(), user.getVerificationCode());
+            emailService.sendVerificationCode(user.getEmail(), user.getVerificationCode(), VERIFICATION_CODE_TTL_MINUTES);
         });
     }
 
@@ -139,7 +139,7 @@ public class AuthService {
             userRepository.save(user);
 
             String resetLink = frontendUrl + "/redefinir-senha?token=" + token;
-            emailService.sendPasswordResetLink(user.getEmail(), resetLink);
+            emailService.sendPasswordResetLink(user.getEmail(), resetLink, RESET_TOKEN_TTL_MINUTES);
         });
     }
 

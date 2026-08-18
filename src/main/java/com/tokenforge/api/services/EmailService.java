@@ -48,23 +48,31 @@ public class EmailService {
     @Value("${app.bugreport-email:}")
     private String bugReportRecipientOverride;
 
-    public void sendVerificationCode(String to, String code) {
-        Map<String, Object> payload = basePayload(to, "TokenForge — Confirme seu e-mail");
-        payload.put("text",
-                "Bem-vindo à Forja!\n\n" +
-                        "Use o código abaixo para verificar seu e-mail:\n\n" +
-                        code + "\n\n" +
-                        "Este código expira em 15 minutos. Se você não criou uma conta, ignore este e-mail.");
+    @Value("${resend.template.verification-id}")
+    private String verificationTemplateId;
+
+    @Value("${resend.template.password-reset-id}")
+    private String passwordResetTemplateId;
+
+    public void sendVerificationCode(String to, String code, int expiresInMinutes) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("from", fromAddress);
+        payload.put("to", to);
+        payload.put("template", Map.of(
+                "id", verificationTemplateId,
+                "variables", Map.of("CODE", code, "EXPIRES_IN_MINUTES", expiresInMinutes)
+        ));
         trySend(payload);
     }
 
-    public void sendPasswordResetLink(String to, String resetLink) {
-        Map<String, Object> payload = basePayload(to, "TokenForge — Recuperação de senha");
-        payload.put("text",
-                "Recebemos uma solicitação para redefinir sua senha.\n\n" +
-                        "Clique no link abaixo para escolher uma nova senha:\n\n" +
-                        resetLink + "\n\n" +
-                        "Este link expira em 30 minutos. Se você não solicitou isso, ignore este e-mail.");
+    public void sendPasswordResetLink(String to, String resetLink, int expiresInMinutes) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("from", fromAddress);
+        payload.put("to", to);
+        payload.put("template", Map.of(
+                "id", passwordResetTemplateId,
+                "variables", Map.of("RESET_URL", resetLink, "EXPIRES_IN_MINUTES", expiresInMinutes)
+        ));
         trySend(payload);
     }
 

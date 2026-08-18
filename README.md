@@ -8,7 +8,7 @@ Backend REST em Spring Boot para o **MTG Token Counter** (TokenForge) — uma ap
 - **Spring Web** — API REST
 - **Spring Data JPA** + **PostgreSQL** (hospedado no [Neon](https://neon.tech))
 - **Spring Security** + **JWT** ([jjwt](https://github.com/jwtk/jjwt)) — autenticação stateless
-- **Spring Mail** — verificação de conta e recuperação de senha por e-mail (SMTP Gmail)
+- **Resend** — verificação de conta e recuperação de senha por e-mail (com templates)
 - **Cloudinary** — armazenamento de imagens (avatar de usuário, anexos de bug report)
 - **Lombok**
 - **Maven**
@@ -34,7 +34,7 @@ src/main/java/com/tokenforge/api/
 - Maven 3.9+ (ou use o `mvnw`, se disponível)
 - Uma instância PostgreSQL (ex.: [Neon](https://neon.tech))
 - Conta Cloudinary
-- Conta Gmail com [senha de app](https://myaccount.google.com/apppasswords) para envio de e-mails
+- Conta [Resend](https://resend.com) com domínio verificado e templates publicados para envio de e-mails
 
 ## Configuração
 
@@ -57,6 +57,8 @@ cp .env.example .env
 | `JWT_SECRET` | Segredo para assinatura dos tokens JWT (mín. 32 caracteres) |
 | `RESEND_API_KEY` | API key do Resend usada para envio de e-mails |
 | `RESEND_FROM_EMAIL` | Remetente dos e-mails (precisa ser de um domínio verificado no Resend) |
+| `RESEND_TEMPLATE_VERIFICATION` | (Opcional) alias/ID do template do e-mail de verificação; padrão `verification-code` |
+| `RESEND_TEMPLATE_PASSWORD_RESET` | (Opcional) alias/ID do template do e-mail de recuperação de senha; padrão `password-reset` |
 | `BUG_REPORT_EMAIL` | (Opcional) destino dos reports de bug; usa `RESEND_FROM_EMAIL` se vazio |
 
 As variáveis são carregadas automaticamente pelo Spring a partir de `src/main/resources/application.properties`. Configure-as no seu ambiente, IDE, ou em um `.env` carregado pela sua ferramenta de execução preferida.
