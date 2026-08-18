@@ -60,7 +60,7 @@ public class EmailService {
         payload.put("to", to);
         payload.put("template", Map.of(
                 "id", verificationTemplateId,
-                "variables", Map.of("CODE", code, "EXPIRES_IN_MINUTES", expiresInMinutes)
+                "variables", Map.of("CODE", code, "EXPIRES_IN_MINUTES", String.valueOf(expiresInMinutes))
         ));
         trySend(payload);
     }
@@ -71,7 +71,7 @@ public class EmailService {
         payload.put("to", to);
         payload.put("template", Map.of(
                 "id", passwordResetTemplateId,
-                "variables", Map.of("RESET_URL", resetLink, "EXPIRES_IN_MINUTES", expiresInMinutes)
+                "variables", Map.of("RESET_URL", resetLink, "EXPIRES_IN_MINUTES", String.valueOf(expiresInMinutes))
         ));
         trySend(payload);
     }
