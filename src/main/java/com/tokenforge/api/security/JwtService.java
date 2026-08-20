@@ -1,5 +1,6 @@
 package com.tokenforge.api.security;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,14 +39,18 @@ public class JwtService {
                 .compact();
     }
 
-    public String validateToken(String token) {
+    /**
+     * Retorna as claims do token (inclui "sub" e "iat") se a assinatura e a expiração
+     * forem válidas, ou null caso contrário. O "iat" é usado pelo SecurityFilter para
+     * rejeitar tokens emitidos antes da última troca de senha do usuário.
+     */
+    public Claims validateToken(String token) {
         try {
             return Jwts.parser()
                     .verifyWith(getSignInKey())
                     .build()
                     .parseSignedClaims(token)
-                    .getPayload()
-                    .getSubject();
+                    .getPayload();
         } catch (Exception e) {
             return null;
         }

@@ -28,8 +28,13 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BiConsumer;
@@ -134,7 +139,7 @@ public class AuthService {
     public void forgotPassword(ForgotPasswordRequest request) {
         userRepository.findByEmail(request.email()).ifPresent(user -> {
             String token = UUID.randomUUID().toString();
-            user.setResetToken(token);
+            user.setResetToken(hashToken(token));
             user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(RESET_TOKEN_TTL_MINUTES));
             userRepository.save(user);
 
@@ -144,7 +149,7 @@ public class AuthService {
     }
 
     public void resetPassword(ResetPasswordRequest request) {
-        User user = userRepository.findByResetToken(request.token())
+        User user = userRepository.findByResetToken(hashToken(request.token()))
                 .orElseThrow(() -> new BusinessRuleException("Link de recuperação inválido ou expirado."));
 
         if (user.getResetTokenExpiry() == null || user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
@@ -154,7 +159,23 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         user.setResetToken(null);
         user.setResetTokenExpiry(null);
+        user.setTokenValidAfter(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
         userRepository.save(user);
+    }
+
+    /**
+     * O token de reset é de alta entropia (UUID aleatório), mas ainda assim é salvo
+     * apenas como hash: se o banco vazar durante a janela de validade do token, o valor
+     * em texto puro (enviado só por e-mail) não pode ser reconstruído a partir do banco.
+     */
+    private String hashToken(String rawToken) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("Algoritmo SHA-256 indisponível na JVM.", e);
+        }
     }
 
     // ── Atualização de perfil ──────────────────────────────
@@ -182,6 +203,7 @@ public class AuthService {
         user.setUsername(request.username().trim());
         if (wantsPasswordChange) {
             user.setPassword(passwordEncoder.encode(request.newPassword()));
+            user.setTokenValidAfter(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
         }
         userRepository.save(user);
 

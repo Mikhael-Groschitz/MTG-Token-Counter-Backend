@@ -34,9 +34,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final LimitedRoute[] LIMITED_ROUTES = {
             new LimitedRoute("POST", "/auth/login", 5, Duration.ofMinutes(1)),
             new LimitedRoute("POST", "/auth/register", 5, Duration.ofMinutes(1)),
+            new LimitedRoute("POST", "/auth/google", 10, Duration.ofMinutes(1)),
             new LimitedRoute("POST", "/auth/verify-email", 5, Duration.ofMinutes(15)),
             new LimitedRoute("POST", "/auth/forgot-password", 5, Duration.ofMinutes(15)),
             new LimitedRoute("POST", "/auth/resend-verification", 5, Duration.ofMinutes(15)),
+            new LimitedRoute("POST", "/auth/reset-password", 5, Duration.ofMinutes(15)),
+            new LimitedRoute("PUT", "/auth/profile", 5, Duration.ofMinutes(15)),
             new LimitedRoute("POST", "/bugs", 3, Duration.ofHours(1)),
     };
 
@@ -93,10 +96,18 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return Bucket.builder().addLimit(limit).build();
     }
 
+    /**
+     * Usa o ÚLTIMO IP da cadeia X-Forwarded-For, não o primeiro: o primeiro trecho é
+     * escrito pelo próprio cliente e pode ser forjado livremente (bastaria enviar um
+     * valor diferente a cada requisição para burlar o limite). O último trecho é o que
+     * o proxy confiável da plataforma (Render/Railway/etc.) anexa com o IP real da
+     * conexão, e não pode ser manipulado pelo lado do cliente.
+     */
     private String clientIp(HttpServletRequest request) {
         String forwardedFor = request.getHeader("X-Forwarded-For");
         if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
+            String[] parts = forwardedFor.split(",");
+            return parts[parts.length - 1].trim();
         }
         return request.getRemoteAddr();
     }

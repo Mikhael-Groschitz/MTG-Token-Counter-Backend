@@ -51,6 +51,11 @@ public class User {
     @Column(name = "reset_token_expiry")
     private LocalDateTime resetTokenExpiry;
 
+    // Tokens JWT emitidos antes deste instante deixam de ser aceitos (ver JwtService/SecurityFilter).
+    // Atualizado sempre que a senha é trocada/redefinida, para revogar sessões antigas.
+    @Column(name = "token_valid_after")
+    private LocalDateTime tokenValidAfter;
+
     @Column(name = "avatar_url")
     private String avatarUrl;
 
