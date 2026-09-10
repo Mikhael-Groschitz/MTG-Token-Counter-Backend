@@ -26,7 +26,7 @@ public record TokenRequestDTO(
         @Size(max = 2000, message = "As habilidades devem ter no máximo 2000 caracteres")
         String abilities,
 
-        @Size(max = 7_000_000, message = "A imagem excede o tamanho máximo permitido")
+        @Size(max = 1_500_000, message = "A imagem excede o tamanho máximo permitido")
         String imageUrl,
 
         @Size(max = 50, message = "O layout deve ter no máximo 50 caracteres")

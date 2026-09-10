@@ -12,6 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -20,11 +22,14 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
 public class SecurityFilter extends OncePerRequestFilter {
+
+    public static final String VERIFIED_AUTHORITY = "VERIFIED";
 
     private static final Logger log = LoggerFactory.getLogger(SecurityFilter.class);
 
@@ -52,11 +57,15 @@ public class SecurityFilter extends OncePerRequestFilter {
                     if (isRevoked(user, claims)) {
                         log.warn("Token revogado (emitido antes da última troca de senha): {}", email);
                     } else {
+                        var authorities = user.isEmailVerified()
+                                ? List.<GrantedAuthority>of(new SimpleGrantedAuthority(VERIFIED_AUTHORITY))
+                                : Collections.<GrantedAuthority>emptyList();
+
                         var authentication = new UsernamePasswordAuthenticationToken(
-                                user, null, Collections.emptyList()
+                                user, null, authorities
                         );
                         SecurityContextHolder.getContext().setAuthentication(authentication);
-                        log.debug("Usuário autenticado: {}", email);
+                        log.debug("Usuário autenticado: {} (e-mail verificado: {})", email, user.isEmailVerified());
                     }
                 } else {
                     log.warn("Token válido mas usuário não encontrado: {}", email);

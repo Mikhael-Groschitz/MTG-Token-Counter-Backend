@@ -49,7 +49,10 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp
-                                .policyDirectives("default-src 'none'; frame-ancestors 'none'")))
+                                .policyDirectives("default-src 'none'; frame-ancestors 'none'"))
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(63072000)))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
@@ -59,7 +62,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/resend-verification").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/reset-password").permitAll()
                         .requestMatchers(HttpMethod.POST, "/bugs").permitAll()
-                        .anyRequest().authenticated()
+                        .anyRequest().hasAuthority(SecurityFilter.VERIFIED_AUTHORITY)
                 )
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(rateLimitFilter, SecurityFilter.class)

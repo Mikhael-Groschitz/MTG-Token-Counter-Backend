@@ -10,6 +10,7 @@ import com.tokenforge.api.repositories.TokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.regex.Pattern;
@@ -26,6 +27,7 @@ public class TokenService {
 
     private final TokenRepository tokenRepository;
     private final CloudinaryService cloudinaryService;
+    private final TransactionTemplate transactionTemplate;
 
     @Transactional(readOnly = true)
     public List<TokenResponseDTO> findAllByUser(User user) {
@@ -35,44 +37,52 @@ public class TokenService {
                 .collect(Collectors.toList());
     }
 
-    @Transactional
     public TokenResponseDTO saveToken(TokenRequestDTO dto, User owner) {
-        // Valida o limite de tokens por usuário
-        long tokenCount = tokenRepository.countByOwnerId(owner.getId());
-        if (tokenCount >= MAX_TOKENS_PER_USER) {
+        ensureWithinTokenLimit(owner);
+
+        String resolvedImageUrl = resolveImageUrl(dto.imageUrl());
+
+        return transactionTemplate.execute(status -> {
+            ensureWithinTokenLimit(owner);
+
+            Token token = new Token();
+            updateTokenFields(token, dto);
+            token.setOwner(owner);
+            token.setImageUrl(resolvedImageUrl);
+
+            return TokenResponseDTO.fromEntity(tokenRepository.save(token));
+        });
+    }
+
+    public TokenResponseDTO updateToken(String id, TokenRequestDTO dto, User user) {
+        validateId(id);
+
+        if (tokenRepository.findByIdAndOwnerId(id, user.getId()).isEmpty()) {
+            throw new ResourceNotFoundException("Token não encontrado na sua biblioteca.");
+        }
+
+        String resolvedImageUrl = resolveImageUrl(dto.imageUrl());
+
+        return transactionTemplate.execute(status -> {
+            Token token = tokenRepository.findByIdAndOwnerId(id, user.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Token não encontrado na sua biblioteca."
+                    ));
+
+            updateTokenFields(token, dto);
+            token.setImageUrl(resolvedImageUrl);
+
+            return TokenResponseDTO.fromEntity(tokenRepository.save(token));
+        });
+    }
+
+    private void ensureWithinTokenLimit(User owner) {
+        if (tokenRepository.countByOwnerId(owner.getId()) >= MAX_TOKENS_PER_USER) {
             throw new BusinessRuleException(
                     "Limite de " + MAX_TOKENS_PER_USER + " tokens atingido. " +
                             "Remova um token antes de criar um novo."
             );
         }
-
-        Token token = new Token();
-        updateTokenFields(token, dto);
-        token.setOwner(owner);
-
-        // Cloudinary: base64 → URL permanente; URL externa → salva direto
-        token.setImageUrl(resolveImageUrl(dto.imageUrl()));
-
-        Token savedToken = tokenRepository.save(token);
-        return TokenResponseDTO.fromEntity(savedToken);
-    }
-
-    @Transactional
-    public TokenResponseDTO updateToken(String id, TokenRequestDTO dto, User user) {
-        validateId(id);
-        Token token = tokenRepository.findByIdAndOwnerId(id, user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Token não encontrado na sua biblioteca."
-                ));
-
-        // Atualiza campos de texto primeiro
-        updateTokenFields(token, dto);
-
-        // Depois resolve a imagem (sobrescreve imageUrl se necessário)
-        token.setImageUrl(resolveImageUrl(dto.imageUrl()));
-
-        Token updatedToken = tokenRepository.save(token);
-        return TokenResponseDTO.fromEntity(updatedToken);
     }
 
     @Transactional

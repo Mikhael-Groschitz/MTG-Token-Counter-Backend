@@ -2,6 +2,7 @@ package com.tokenforge.api.services;
 
 import com.tokenforge.api.dto.BugReportRequest;
 import com.tokenforge.api.entities.User;
+import com.tokenforge.api.exceptions.BusinessRuleException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -12,14 +13,37 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BugReportService {
 
+    private static final int MAX_ATTACHMENTS = 5;
+
+    private static final int MAX_SUBJECT_LENGTH = 150;
+
     private final EmailService emailService;
 
     public void submit(BugReportRequest request, List<MultipartFile> files, User user) {
-        String subject = "[TokenForge] Bug report: " + request.title();
+        if (files != null && files.size() > MAX_ATTACHMENTS) {
+            throw new BusinessRuleException(
+                    "Envie no máximo " + MAX_ATTACHMENTS + " arquivos por report."
+            );
+        }
+
+        String subject = "[TokenForge] Bug report: " + sanitizeSubject(request.title());
         String body = buildBody(request, files, user);
         String replyTo = user != null ? user.getEmail() : request.reporterEmail();
 
         emailService.sendBugReport(subject, body, files, replyTo);
+    }
+
+    private String sanitizeSubject(String title) {
+        if (title == null) {
+            return "(sem título)";
+        }
+        String singleLine = title.replaceAll("[\\r\\n]+", " ").trim();
+        if (singleLine.isEmpty()) {
+            return "(sem título)";
+        }
+        return singleLine.length() > MAX_SUBJECT_LENGTH
+                ? singleLine.substring(0, MAX_SUBJECT_LENGTH) + "…"
+                : singleLine;
     }
 
     private String buildBody(BugReportRequest request, List<MultipartFile> files, User user) {

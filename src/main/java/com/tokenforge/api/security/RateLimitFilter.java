@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Limita a taxa de requisições (por IP) nos endpoints anônimos mais sensíveis a abuso:
@@ -41,12 +42,30 @@ public class RateLimitFilter extends OncePerRequestFilter {
             new LimitedRoute("POST", "/auth/reset-password", 5, Duration.ofMinutes(15)),
             new LimitedRoute("PUT", "/auth/profile", 5, Duration.ofMinutes(15)),
             new LimitedRoute("POST", "/bugs", 3, Duration.ofHours(1)),
+            new LimitedRoute("POST", "/tokens", 20, Duration.ofMinutes(1)),
+            new LimitedRoute("PUT", "/tokens/*", 30, Duration.ofMinutes(1)),
+            new LimitedRoute("DELETE", "/tokens/*", 30, Duration.ofMinutes(1)),
+            new LimitedRoute("POST", "/uploads/signature", 20, Duration.ofMinutes(1)),
     };
 
     private static final String ATTR_PROCESSED = "com.tokenforge.rateLimitProcessed";
 
+    private static final int CLEANUP_THRESHOLD = 10_000;
+    private static final Duration IDLE_TTL = Duration.ofHours(2);
+
+    private static final class TrackedBucket {
+        private final Bucket bucket;
+        private volatile long lastAccessNanos;
+
+        private TrackedBucket(Bucket bucket) {
+            this.bucket = bucket;
+            this.lastAccessNanos = System.nanoTime();
+        }
+    }
+
     private final ObjectMapper objectMapper;
-    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+    private final Map<String, TrackedBucket> buckets = new ConcurrentHashMap<>();
+    private final AtomicBoolean cleaningUp = new AtomicBoolean(false);
 
     @Override
     protected void doFilterInternal(
@@ -68,9 +87,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         String bucketKey = route.method() + " " + route.path() + "|" + clientIp(request);
-        Bucket bucket = buckets.computeIfAbsent(bucketKey, key -> newBucket(route));
+        evictIdleBucketsIfNeeded();
 
-        if (bucket.tryConsume(1)) {
+        TrackedBucket tracked = buckets.computeIfAbsent(bucketKey, key -> new TrackedBucket(newBucket(route)));
+        tracked.lastAccessNanos = System.nanoTime();
+
+        if (tracked.bucket.tryConsume(1)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -81,11 +103,30 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private LimitedRoute matchRoute(HttpServletRequest request) {
         String path = request.getServletPath();
         for (LimitedRoute route : LIMITED_ROUTES) {
-            if (route.method().equalsIgnoreCase(request.getMethod()) && route.path().equals(path)) {
+            if (route.method().equalsIgnoreCase(request.getMethod()) && pathMatches(route.path(), path)) {
                 return route;
             }
         }
         return null;
+    }
+
+    private boolean pathMatches(String routePath, String requestPath) {
+        if (routePath.endsWith("/*")) {
+            return requestPath.startsWith(routePath.substring(0, routePath.length() - 1));
+        }
+        return routePath.equals(requestPath);
+    }
+
+    private void evictIdleBucketsIfNeeded() {
+        if (buckets.size() < CLEANUP_THRESHOLD || !cleaningUp.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            long cutoff = System.nanoTime() - IDLE_TTL.toNanos();
+            buckets.values().removeIf(tracked -> tracked.lastAccessNanos < cutoff);
+        } finally {
+            cleaningUp.set(false);
+        }
     }
 
     private Bucket newBucket(LimitedRoute route) {

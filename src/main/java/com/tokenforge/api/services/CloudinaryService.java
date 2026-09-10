@@ -9,24 +9,57 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 @Service
 public class CloudinaryService {
 
     private static final Logger log = LoggerFactory.getLogger(CloudinaryService.class);
 
+    private static final String UPLOAD_FOLDER = "tokenforge";
+
+    private static final String ALLOWED_FORMATS = "png,jpg,jpeg,webp,gif";
+
+    private static final int UPLOAD_TIMEOUT_SECONDS = 20;
+
     private final Cloudinary cloudinary;
+    private final String cloudName;
+    private final String apiKey;
+    private final String apiSecret;
 
     public CloudinaryService(
             @Value("${cloudinary.cloud-name}") String cloudName,
             @Value("${cloudinary.api-key}") String apiKey,
             @Value("${cloudinary.api-secret}") String apiSecret) {
+        this.cloudName = cloudName;
+        this.apiKey = apiKey;
+        this.apiSecret = apiSecret;
         this.cloudinary = new Cloudinary(ObjectUtils.asMap(
                 "cloud_name", cloudName,
                 "api_key", apiKey,
                 "api_secret", apiSecret));
+    }
+
+    public Map<String, Object> buildSignedUploadParams() {
+        long timestamp = System.currentTimeMillis() / 1000L;
+
+        Map<String, Object> paramsToSign = new TreeMap<>();
+        paramsToSign.put("timestamp", timestamp);
+        paramsToSign.put("folder", UPLOAD_FOLDER);
+        paramsToSign.put("allowed_formats", ALLOWED_FORMATS);
+
+        String signature = cloudinary.apiSignRequest(paramsToSign, apiSecret);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("cloud_name", cloudName);
+        response.put("api_key", apiKey);
+        response.put("timestamp", timestamp);
+        response.put("folder", UPLOAD_FOLDER);
+        response.put("allowed_formats", ALLOWED_FORMATS);
+        response.put("signature", signature);
+        return response;
     }
 
     public String uploadImage(String base64Image) {
@@ -36,7 +69,9 @@ public class CloudinaryService {
                     base64Image,
                     ObjectUtils.asMap(
                             "resource_type", "image",
-                            "allowed_formats", List.of("png", "jpg", "jpeg", "webp", "gif")
+                            "folder", UPLOAD_FOLDER,
+                            "timeout", UPLOAD_TIMEOUT_SECONDS,
+                            "allowed_formats", ALLOWED_FORMATS
                     )
             );
 

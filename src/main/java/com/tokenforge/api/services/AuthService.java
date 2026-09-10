@@ -52,6 +52,10 @@ public class AuthService {
     private static final String PROVIDER_LOCAL = "local";
     private static final String PROVIDER_GOOGLE = "google";
 
+    private static final String LOGIN_FAILED_MESSAGE =
+            "Não foi possível realizar o login. Verifique se os dados foram digitados "
+                    + "corretamente ou recupere sua senha.";
+
     private static final int VERIFICATION_CODE_TTL_MINUTES = 15;
     private static final int RESET_TOKEN_TTL_MINUTES = 30;
     private static final int MAX_VERIFICATION_ATTEMPTS = 5;
@@ -86,7 +90,7 @@ public class AuthService {
         emailService.sendVerificationCode(newUser.getEmail(), newUser.getVerificationCode(), VERIFICATION_CODE_TTL_MINUTES);
 
         String token = jwtService.generateToken(newUser.getEmail());
-        return new AuthResponse(token, newUser.getUsername(), newUser.getEmail(), PROVIDER_LOCAL);
+        return new AuthResponse(token, newUser.getUsername(), newUser.getEmail(), PROVIDER_LOCAL, newUser.isEmailVerified());
     }
 
     // ── Verificação de e-mail ──────────────────────────────
@@ -208,7 +212,7 @@ public class AuthService {
         userRepository.save(user);
 
         String token = jwtService.generateToken(user.getEmail());
-        return new AuthResponse(token, user.getUsername(), user.getEmail(), resolveProvider(user));
+        return new AuthResponse(token, user.getUsername(), user.getEmail(), resolveProvider(user), user.isEmailVerified());
     }
 
     private void applyNewVerificationCode(User user) {
@@ -223,11 +227,11 @@ public class AuthService {
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByUsernameOrEmail(request.identifier(), request.identifier())
                 .orElseThrow(() -> new BusinessRuleException(
-                        "Credenciais inválidas. Verifique seu e-mail/usuário e senha."));
+                        LOGIN_FAILED_MESSAGE));
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new BusinessRuleException(
-                    "Credenciais inválidas. Verifique seu e-mail/usuário e senha.");
+                    LOGIN_FAILED_MESSAGE);
         }
 
         if (!user.isEmailVerified()) {
@@ -235,7 +239,7 @@ public class AuthService {
         }
 
         String token = jwtService.generateToken(user.getEmail());
-        return new AuthResponse(token, user.getUsername(), user.getEmail(), resolveProvider(user));
+        return new AuthResponse(token, user.getUsername(), user.getEmail(), resolveProvider(user), user.isEmailVerified());
     }
 
     // ── Login com Google ──────────────────────────────────
@@ -293,7 +297,7 @@ public class AuthService {
                         }));
 
         String token = jwtService.generateToken(user.getEmail());
-        return new AuthResponse(token, user.getUsername(), user.getEmail(), resolveProvider(user));
+        return new AuthResponse(token, user.getUsername(), user.getEmail(), resolveProvider(user), user.isEmailVerified());
     }
 
     private String resolveProvider(User user) {

@@ -14,13 +14,13 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -30,14 +30,25 @@ public class EmailService {
 
     private static final String RESEND_API_URL = "https://api.resend.com/emails";
 
-    private static final Set<String> ALLOWED_ATTACHMENT_CONTENT_TYPES = Set.of(
-            "image/png", "image/jpeg", "image/webp", "image/gif",
-            "text/plain", "application/pdf"
+    private static final Map<String, String> ATTACHMENT_EXTENSIONS = Map.of(
+            "image/png", "png",
+            "image/jpeg", "jpg",
+            "image/webp", "webp",
+            "image/gif", "gif",
+            "text/plain", "txt",
+            "application/pdf", "pdf"
     );
+
+    private static final int MAX_FILENAME_BASE_LENGTH = 80;
 
     private final ObjectMapper objectMapper;
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(20);
+
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(CONNECT_TIMEOUT)
+            .build();
 
     @Value("${resend.api-key}")
     private String resendApiKey;
@@ -102,8 +113,11 @@ public class EmailService {
 
         try {
             send(payload);
-        } catch (IOException | InterruptedException e) {
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            log.error("Envio do bug report interrompido: {}", e.getMessage(), e);
+            throw new BusinessRuleException("Não foi possível enviar seu report agora. Tente novamente em instantes.");
+        } catch (IOException e) {
             log.error("Falha ao enviar bug report por e-mail: {}", e.getMessage(), e);
             throw new BusinessRuleException("Não foi possível enviar seu report agora. Tente novamente em instantes.");
         }
@@ -121,15 +135,15 @@ public class EmailService {
         if (file == null || file.isEmpty()) {
             return null;
         }
-        String contentType = file.getContentType();
-        if (contentType == null || !ALLOWED_ATTACHMENT_CONTENT_TYPES.contains(contentType)) {
+        String contentType = normalizeContentType(file.getContentType());
+        if (contentType == null || !ATTACHMENT_EXTENSIONS.containsKey(contentType)) {
             throw new BusinessRuleException(
                     "Tipo de arquivo não permitido nos anexos. " +
                             "Envie apenas imagens (PNG, JPEG, WEBP, GIF), PDF ou texto simples.");
         }
         try {
             Map<String, String> attachment = new LinkedHashMap<>();
-            attachment.put("filename", sanitizeFilename(file.getOriginalFilename()));
+            attachment.put("filename", buildFilename(file.getOriginalFilename(), contentType));
             attachment.put("content", Base64.getEncoder().encodeToString(file.getBytes()));
             return attachment;
         } catch (IOException e) {
@@ -140,8 +154,10 @@ public class EmailService {
     private void trySend(Map<String, Object> payload) {
         try {
             send(payload);
-        } catch (IOException | InterruptedException e) {
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            log.error("Envio de e-mail para {} interrompido: {}", payload.get("to"), e.getMessage(), e);
+        } catch (IOException e) {
             log.error("Falha ao enviar e-mail para {}: {}", payload.get("to"), e.getMessage(), e);
         }
     }
@@ -151,6 +167,7 @@ public class EmailService {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(RESEND_API_URL))
+                .timeout(REQUEST_TIMEOUT)
                 .header("Authorization", "Bearer " + resendApiKey)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -165,11 +182,37 @@ public class EmailService {
         }
     }
 
-    private String sanitizeFilename(String filename) {
-        if (filename == null || filename.isBlank()) {
-            return "anexo";
+    private String normalizeContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return null;
         }
-        String base = Paths.get(filename).getFileName().toString();
-        return base.replaceAll("[^a-zA-Z0-9._-]", "_");
+        int separator = contentType.indexOf(';');
+        String base = separator >= 0 ? contentType.substring(0, separator) : contentType;
+        return base.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String buildFilename(String originalFilename, String contentType) {
+        String extension = ATTACHMENT_EXTENSIONS.get(contentType);
+        String base = "anexo";
+
+        if (originalFilename != null && !originalFilename.isBlank()) {
+            String name = originalFilename;
+            int separator = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
+            if (separator >= 0) {
+                name = name.substring(separator + 1);
+            }
+            int dot = name.lastIndexOf('.');
+            if (dot > 0) {
+                name = name.substring(0, dot);
+            }
+            name = name.replaceAll("[^a-zA-Z0-9._-]", "_");
+            if (!name.isBlank()) {
+                base = name.length() > MAX_FILENAME_BASE_LENGTH
+                        ? name.substring(0, MAX_FILENAME_BASE_LENGTH)
+                        : name;
+            }
+        }
+
+        return base + "." + extension;
     }
 }
